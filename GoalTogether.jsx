@@ -704,7 +704,7 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
               <div>
                 <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 7, fontWeight: 700, letterSpacing: .5 }}>CHOOSE YOUR PLAN</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {[{ val: "individual", icon: "🧑", label: "Individual", price: "$149/yr" }, { val: "couple", icon: "💑", label: "Couple", price: "$199/yr" }].map(({ val, icon, label, price }) => (
+                  {[{ val: "individual", icon: "🧑", label: "Individual", price: "KES 149/yr" }, { val: "couple", icon: "💑", label: "Couple", price: "KES 199/yr" }].map(({ val, icon, label, price }) => (
                     <button key={val} onClick={() => setSF(f => ({ ...f, plan: val }))} style={{
                       background: sf.plan === val ? `${G.purple}25` : G.bg2,
                       border: `2px solid ${sf.plan === val ? G.purple : G.border}`,
