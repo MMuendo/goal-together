@@ -409,11 +409,16 @@ const Dashboard = ({ user }) => {
 
   return (
     <div className="fadeUp">
-      <div style={{ marginBottom: 18 }}>
-        <h2 style={{ fontFamily: font, fontSize: isMobile ? 20 : 24, lineHeight: 1.2 }}>
-          Hey, {user.name}{user.plan === "couple" && user.partnerName ? ` & ${user.partnerName}` : ""} 💑
-        </h2>
-        <p style={{ color: G.textMuted, fontSize: 12, marginTop: 3 }}>Here's how your journey is going.</p>
+      <div style={{ marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h2 style={{ fontFamily: font, fontSize: isMobile ? 20 : 24, lineHeight: 1.2 }}>
+            Hey, {user.name}{user.plan === "couple" && user.partnerName ? ` & ${user.partnerName}` : ""} 💑
+          </h2>
+          <p style={{ color: G.textMuted, fontSize: 12, marginTop: 3 }}>Here's how your journey is going.</p>
+        </div>
+        <a href="/couple_goals_tracker.xlsx" download style={{ textDecoration: "none" }}>
+          <Btn size="sm" variant="gold">📥 Tracker</Btn>
+        </a>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginBottom: 16 }}>
