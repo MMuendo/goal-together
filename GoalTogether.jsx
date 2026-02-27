@@ -611,6 +611,7 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack, authUser }) => {
   const [mode, setMode] = useState(initMode);
   const [sf, setSF] = useState({ name: "", partner: "", email: "", password: "", plan: defaultPlan || "couple" });
   const [lf, setLF] = useState({ email: "", password: "" });
+  const [resetPwd, setResetPwd] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -624,6 +625,18 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack, authUser }) => {
     setLoading(false);
     if (error) setErrorMsg(error.message);
     else setErrorMsg("Password reset email sent! Check your inbox.");
+  };
+
+  const handleSetNewPassword = async () => {
+    if (resetPwd.length < 6) return setErrorMsg("Password must be at least 6 characters.");
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: resetPwd });
+    setLoading(false);
+    if (error) setErrorMsg(error.message);
+    else {
+      setErrorMsg("Password updated successfully!");
+      setTimeout(() => setMode("login"), 1500);
+    }
   };
 
   // Paystack config
@@ -691,10 +704,15 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack, authUser }) => {
           <div style={{ fontFamily: font, fontSize: 26 }}>
             <span style={{ background: `linear-gradient(135deg, ${G.purple}, ${G.pink})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Goal</span>Together
           </div>
-          <p style={{ color: G.textMuted, marginTop: 4, fontSize: 12 }}>{mode === "complete_profile" ? "Finish your profile" : mode === "signup" ? "Create your account" : "Welcome back"}</p>
+          <p style={{ color: G.textMuted, marginTop: 4, fontSize: 12 }}>
+            {mode === "complete_profile" ? "Finish your profile"
+              : mode === "reset_password" ? "Set New Password"
+                : mode === "signup" ? "Create your account"
+                  : "Welcome back"}
+          </p>
         </div>
         {errorMsg && <div style={{ background: `${G.red}20`, color: G.red, padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 15, textAlign: "center", border: `1px solid ${G.red}50` }}>{errorMsg}</div>}
-        {mode !== "complete_profile" && (
+        {(mode !== "complete_profile" && mode !== "reset_password") && (
           <div style={{ display: "flex", background: G.bg2, borderRadius: 12, padding: 4, marginBottom: 22, border: `1px solid ${G.border}` }}>
             {["signup", "login"].map(m => (
               <button key={m} onClick={() => setMode(m)} style={{
@@ -733,8 +751,29 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack, authUser }) => {
                   <input value={sf.partner} onChange={e => setSF(f => ({ ...f, partner: e.target.value }))} placeholder="Your partner's first name" />
                 </div>
               )}
-              <Btn full size="lg" style={{ marginTop: 4 }} onClick={() => onSuccess("complete_profile", sf, authUser)} disabled={!sf.name}>
-                💾 Finish Setup →
+              <div>
+                <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>CREATE PASSWORD</label>
+                <input type="password" value={sf.password} onChange={e => setSF(f => ({ ...f, password: e.target.value }))} placeholder="Set your password" />
+              </div>
+              <Btn full size="lg" style={{ marginTop: 4 }} onClick={async () => {
+                if (sf.password) {
+                  setLoading(true);
+                  await supabase.auth.updateUser({ password: sf.password });
+                  setLoading(false);
+                }
+                onSuccess("complete_profile", sf, authUser);
+              }} disabled={!sf.name || !sf.password || loading}>
+                {loading ? "Processing..." : "💾 Finish Setup →"}
+              </Btn>
+            </div>
+          ) : mode === "reset_password" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+              <div>
+                <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>NEW PASSWORD</label>
+                <input type="password" value={resetPwd} onChange={e => setResetPwd(e.target.value)} placeholder="Enter new password" />
+              </div>
+              <Btn full size="lg" style={{ marginTop: 4 }} onClick={handleSetNewPassword} disabled={!resetPwd || loading}>
+                {loading ? "Saving..." : "Update Password"}
               </Btn>
             </div>
           ) : mode === "signup" ? (
@@ -932,14 +971,25 @@ export default function App() {
       if (session) fetchUserData(session.user);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthCfg({ mode: "reset_password", plan: "couple" });
+        setScreen("auth");
+        return;
+      }
       setAuthSession(session);
-      if (session) fetchUserData(session.user);
+      if (session) {
+        // Delay fetching so we don't accidentally hide the reset form on recovery
+        if (screen !== "auth" || authCfg.mode !== "reset_password") {
+          fetchUserData(session.user);
+        }
+      }
       else { setUser(null); setScreen("landing"); }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, authCfg.mode]);
 
   const fetchUserData = async (authUser) => {
     try {
