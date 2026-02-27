@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePaystackPayment } from "react-paystack";
+import { supabase } from "./supabaseClient";
 
 const STORAGE_KEY = "goaltogether_v2";
 
@@ -605,6 +606,20 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
   const [mode, setMode] = useState(initMode);
   const [sf, setSF] = useState({ name: "", partner: "", email: "", password: "", plan: defaultPlan || "couple" });
   const [lf, setLF] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleResetPassword = async () => {
+    if (!lf.email) {
+      setErrorMsg("Please enter your email to reset password.");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(lf.email);
+    setLoading(false);
+    if (error) setErrorMsg(error.message);
+    else setErrorMsg("Password reset email sent! Check your inbox.");
+  };
 
   // Paystack config
   const amountToCharge = sf.plan === "couple" ? 199 : 149;
@@ -619,23 +634,44 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
   const initializePayment = usePaystackPayment(config);
 
   const handleCreateAccount = () => {
-    // If public key is obviously a placeholder, just succeed for local dev.
     if (config.publicKey.includes("xxxx")) {
       alert("Paystack Key missing: Bypassing checkout for local development.");
-      onSuccess("signup", sf);
+      processSignup();
       return;
     }
 
     initializePayment(
-      (ref) => {
-        // Payment complete!
-        onSuccess("signup", sf);
-      },
-      () => {
-        // Payment closed/cancelled
-        alert("Payment was not completed.");
-      }
+      (ref) => { processSignup(); },
+      () => { setErrorMsg("Payment was not completed."); }
     );
+  };
+
+  const processSignup = async () => {
+    setLoading(true); setErrorMsg("");
+    const { data, error } = await supabase.auth.signUp({
+      email: sf.email,
+      password: sf.password,
+    });
+    setLoading(false);
+    if (error) {
+      setErrorMsg(error.message);
+    } else {
+      onSuccess("signup", sf, data.user);
+    }
+  };
+
+  const processLogin = async () => {
+    setLoading(true); setErrorMsg("");
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: lf.email,
+      password: lf.password,
+    });
+    setLoading(false);
+    if (error) {
+      setErrorMsg(error.message);
+    } else {
+      onSuccess("login", lf, data.user);
+    }
   };
 
   return (
@@ -652,6 +688,7 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
           </div>
           <p style={{ color: G.textMuted, marginTop: 4, fontSize: 12 }}>{mode === "signup" ? "Create your account" : "Welcome back"}</p>
         </div>
+        {errorMsg && <div style={{ background: `${G.red}20`, color: G.red, padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 15, textAlign: "center", border: `1px solid ${G.red}50` }}>{errorMsg}</div>}
         <div style={{ display: "flex", background: G.bg2, borderRadius: 12, padding: 4, marginBottom: 22, border: `1px solid ${G.border}` }}>
           {["signup", "login"].map(m => (
             <button key={m} onClick={() => setMode(m)} style={{
@@ -698,8 +735,8 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
                 <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>PASSWORD</label>
                 <input type="password" value={sf.password} onChange={e => setSF(f => ({ ...f, password: e.target.value }))} placeholder="Create a password" />
               </div>
-              <Btn full size="lg" style={{ marginTop: 4 }} onClick={handleCreateAccount} disabled={!sf.name || !sf.email}>
-                🚀 Create Account — {sf.plan === "couple" ? "KES 199" : "KES 149"}/yr
+              <Btn full size="lg" style={{ marginTop: 4 }} onClick={handleCreateAccount} disabled={!sf.name || !sf.email || !sf.password || loading}>
+                {loading ? "Processing..." : `🚀 Create Account — KES ${sf.plan === "couple" ? "199" : "149"}/yr`}
               </Btn>
               <p style={{ fontSize: 10, color: G.textDim, textAlign: "center" }}>Secured via Paystack (Card & M-PESA)</p>
             </div>
@@ -713,7 +750,10 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
                 <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>PASSWORD</label>
                 <input type="password" value={lf.password} onChange={e => setLF(f => ({ ...f, password: e.target.value }))} placeholder="Your password" />
               </div>
-              <Btn full size="lg" style={{ marginTop: 4 }} onClick={() => onSuccess("login", lf)}>Log In →</Btn>
+              <Btn full size="lg" style={{ marginTop: 4 }} onClick={processLogin} disabled={loading || !lf.email || !lf.password}>
+                {loading ? "Logging in..." : "Log In →"}
+              </Btn>
+              <button onClick={handleResetPassword} style={{ background: "none", border: "none", color: G.purpleLight, fontSize: 11, cursor: "pointer", marginTop: 8, textDecoration: "underline" }}>Forgot Password?</button>
             </div>
           )}
         </Card>
@@ -846,47 +886,66 @@ export default function App() {
   const [screen, setScreen] = useState("landing");
   const [authCfg, setAuthCfg] = useState({ mode: "signup", plan: "couple" });
   const [user, setUser] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [authSession, setAuthSession] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get(STORAGE_KEY);
-        if (res) {
-          const d = JSON.parse(res.value);
-          const us = d.users || [];
-          setUsers(us);
-          if (d.currentUserId) {
-            const u = us.find(u => u.id === d.currentUserId);
-            if (u) { setUser(u); setScreen("app"); }
-          }
-        }
-      } catch { }
-    })();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthSession(session);
+      if (session) fetchUserData(session.user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthSession(session);
+      if (session) fetchUserData(session.user);
+      else { setUser(null); setScreen("landing"); }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const persist = async (all, cid) => {
-    try { await window.storage.set(STORAGE_KEY, JSON.stringify({ users: all, currentUserId: cid })); } catch { }
+  const fetchUserData = async (authUser) => {
+    try {
+      const { data, error } = await supabase.from("users").select("data").eq("id", authUser.id).single();
+      if (data && data.data && data.data.name) {
+        setUser(data.data);
+        setScreen("app");
+      } else {
+        // Need to create profile data (this handles edge case if they just signed up)
+        setUser(null);
+      }
+    } catch { }
+  };
+
+  const persist = async (dataToSave, uuid) => {
+    try {
+      await supabase.from("users").upsert({ id: uuid, email: dataToSave.email, data: dataToSave }, { onConflict: "id" });
+    } catch (e) { console.error("Could not save to Supabase", e); }
   };
 
   const handleUpdateUser = (updated) => {
-    const nu = users.map(u => u.id === updated.id ? updated : u);
-    setUsers(nu); setUser(updated); persist(nu, updated.id);
+    setUser(updated);
+    if (authSession) persist(updated, authSession.user.id);
   };
 
-  const handleAuth = (mode, fd) => {
+  const handleAuth = async (mode, fd, authUser) => {
+    if (!authUser) return;
+
     if (mode === "signup") {
       const nu = newUser(fd.name, fd.partner, fd.plan, fd.email);
-      const updated = [...users, nu];
-      setUsers(updated); setUser(nu); persist(updated, nu.id); setScreen("app");
+      await persist(nu, authUser.id);
+      setUser(nu);
+      setScreen("app");
     } else {
-      const found = users.find(u => u.email === fd.email);
-      if (found) { setUser(found); persist(users, found.id); setScreen("app"); }
-      else alert("No account found. Please sign up first.");
+      // Login - handled by auth state change primarily, but we can fast track it:
+      await fetchUserData(authUser);
     }
   };
 
-  const handleLogout = () => { setUser(null); persist(users, null); setScreen("landing"); };
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setScreen("landing");
+  };
 
   if (screen === "landing") return (
     <><style>{css}</style><Landing onGetStarted={plan => { setAuthCfg({ mode: "signup", plan }); setScreen("auth"); }} onLogin={() => { setAuthCfg({ mode: "login", plan: "couple" }); setScreen("auth"); }} /></>
