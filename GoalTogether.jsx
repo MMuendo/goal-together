@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePaystackPayment } from "react-paystack";
 
 const STORAGE_KEY = "goaltogether_v2";
 
@@ -564,8 +565,8 @@ const Landing = ({ onGetStarted, onLogin }) => {
           <div style={{ background: G.card, border: `1px solid ${G.border}`, borderRadius: 20, padding: isMobile ? 24 : 30, flex: 1, textAlign: "center" }}>
             <div style={{ fontSize: 34, marginBottom: 8 }}>🧑</div>
             <div style={{ fontFamily: font, fontSize: 18, marginBottom: 5 }}>Individual</div>
-            <div style={{ fontFamily: font, fontSize: 44, color: G.purpleLight, lineHeight: 1 }}>KES 0</div>
-            <div style={{ color: G.textMuted, fontSize: 11, marginBottom: 20 }}>Free for now!</div>
+            <div style={{ fontFamily: font, fontSize: 44, color: G.purpleLight, lineHeight: 1 }}>KES 149</div>
+            <div style={{ color: G.textMuted, fontSize: 11, marginBottom: 20 }}>per year</div>
             {["Personal goal dashboard", "Unlimited goals", "KPI & progress tracking", "Monthly check-ins", "Hall of Fame", "Analytics"].map(f => (
               <div key={f} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 7, textAlign: "left" }}>
                 <span style={{ color: G.green, fontWeight: 700 }}>✓</span>
@@ -579,8 +580,8 @@ const Landing = ({ onGetStarted, onLogin }) => {
             <div style={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", background: `linear-gradient(135deg, ${G.purple}, ${G.pink})`, borderRadius: 99, padding: "4px 14px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>⭐ MOST POPULAR</div>
             <div style={{ fontSize: 34, marginBottom: 8 }}>💑</div>
             <div style={{ fontFamily: font, fontSize: 18, marginBottom: 5 }}>Couple</div>
-            <div style={{ fontFamily: font, fontSize: 44, color: G.purpleLight, lineHeight: 1 }}>KES 0</div>
-            <div style={{ color: G.textMuted, fontSize: 11, marginBottom: 20 }}>Free for now! · 2 people</div>
+            <div style={{ fontFamily: font, fontSize: 44, color: G.purpleLight, lineHeight: 1 }}>KES 199</div>
+            <div style={{ color: G.textMuted, fontSize: 11, marginBottom: 20 }}>per year · 2 people</div>
             {["Everything in Individual", "His + Her + Couple tracks", "Joint analytics", "Partner personalisation", "Shared Hall of Fame", "Couples check-in ritual"].map(f => (
               <div key={f} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 7, textAlign: "left" }}>
                 <span style={{ color: G.purple, fontWeight: 700 }}>✓</span>
@@ -604,6 +605,38 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
   const [mode, setMode] = useState(initMode);
   const [sf, setSF] = useState({ name: "", partner: "", email: "", password: "", plan: defaultPlan || "couple" });
   const [lf, setLF] = useState({ email: "", password: "" });
+
+  // Paystack config
+  const amountToCharge = sf.plan === "couple" ? 199 : 149;
+  const config = {
+    reference: (new Date()).getTime().toString(),
+    email: sf.email || "guest@goaltogether.com",
+    amount: amountToCharge * 100, // Paystack amount is in kobo/cents
+    publicKey: "pk_live_786a2015613ac0cadb80564c2950cbb82532db3a",
+    currency: "KES",
+  };
+
+  const initializePayment = usePaystackPayment(config);
+
+  const handleCreateAccount = () => {
+    // If public key is obviously a placeholder, just succeed for local dev.
+    if (config.publicKey.includes("xxxx")) {
+      alert("Paystack Key missing: Bypassing checkout for local development.");
+      onSuccess("signup", sf);
+      return;
+    }
+
+    initializePayment(
+      (ref) => {
+        // Payment complete!
+        onSuccess("signup", sf);
+      },
+      () => {
+        // Payment closed/cancelled
+        alert("Payment was not completed.");
+      }
+    );
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: G.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -665,10 +698,10 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
                 <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>PASSWORD</label>
                 <input type="password" value={sf.password} onChange={e => setSF(f => ({ ...f, password: e.target.value }))} placeholder="Create a password" />
               </div>
-              <Btn full size="lg" style={{ marginTop: 4 }} onClick={() => onSuccess("signup", sf)} disabled={!sf.name || !sf.email}>
-                🚀 Create Account — {sf.plan === "couple" ? "KES 0" : "KES 0"}
+              <Btn full size="lg" style={{ marginTop: 4 }} onClick={handleCreateAccount} disabled={!sf.name || !sf.email}>
+                🚀 Create Account — {sf.plan === "couple" ? "KES 199" : "KES 149"}/yr
               </Btn>
-              <p style={{ fontSize: 10, color: G.textDim, textAlign: "center" }}>No payment needed for this demo.</p>
+              <p style={{ fontSize: 10, color: G.textDim, textAlign: "center" }}>Secured via Paystack (Card & M-PESA)</p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GoalTogether</string>
+    <string name="title_activity_main">GoalTogether</string>
+    <string name="package_name">com.goaltogether.app</string>
+    <string name="custom_url_scheme">com.goaltogether.app</string>
+</resources>
