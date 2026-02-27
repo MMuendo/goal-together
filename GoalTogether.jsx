@@ -607,7 +607,7 @@ const Landing = ({ onGetStarted, onLogin }) => {
 };
 
 // ── Auth Screen ───────────────────────────────────────────────────────────────
-const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
+const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack, authUser }) => {
   const [mode, setMode] = useState(initMode);
   const [sf, setSF] = useState({ name: "", partner: "", email: "", password: "", plan: defaultPlan || "couple" });
   const [lf, setLF] = useState({ email: "", password: "" });
@@ -691,20 +691,53 @@ const Auth = ({ mode: initMode, defaultPlan, onSuccess, onBack }) => {
           <div style={{ fontFamily: font, fontSize: 26 }}>
             <span style={{ background: `linear-gradient(135deg, ${G.purple}, ${G.pink})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Goal</span>Together
           </div>
-          <p style={{ color: G.textMuted, marginTop: 4, fontSize: 12 }}>{mode === "signup" ? "Create your account" : "Welcome back"}</p>
+          <p style={{ color: G.textMuted, marginTop: 4, fontSize: 12 }}>{mode === "complete_profile" ? "Finish your profile" : mode === "signup" ? "Create your account" : "Welcome back"}</p>
         </div>
         {errorMsg && <div style={{ background: `${G.red}20`, color: G.red, padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 15, textAlign: "center", border: `1px solid ${G.red}50` }}>{errorMsg}</div>}
-        <div style={{ display: "flex", background: G.bg2, borderRadius: 12, padding: 4, marginBottom: 22, border: `1px solid ${G.border}` }}>
-          {["signup", "login"].map(m => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              flex: 1, padding: "9px", borderRadius: 9, fontWeight: 700, fontSize: 13,
-              background: mode === m ? `linear-gradient(135deg, ${G.purple}, ${G.pink})` : "transparent",
-              color: mode === m ? "#fff" : G.textMuted, border: "none", cursor: "pointer",
-            }}>{m === "signup" ? "Sign Up" : "Log In"}</button>
-          ))}
-        </div>
+        {mode !== "complete_profile" && (
+          <div style={{ display: "flex", background: G.bg2, borderRadius: 12, padding: 4, marginBottom: 22, border: `1px solid ${G.border}` }}>
+            {["signup", "login"].map(m => (
+              <button key={m} onClick={() => setMode(m)} style={{
+                flex: 1, padding: "9px", borderRadius: 9, fontWeight: 700, fontSize: 13,
+                background: mode === m ? `linear-gradient(135deg, ${G.purple}, ${G.pink})` : "transparent",
+                color: mode === m ? "#fff" : G.textMuted, border: "none", cursor: "pointer",
+              }}>{m === "signup" ? "Sign Up" : "Log In"}</button>
+            ))}
+          </div>
+        )}
         <Card glow>
-          {mode === "signup" ? (
+          {mode === "complete_profile" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+              <div>
+                <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 7, fontWeight: 700, letterSpacing: .5 }}>CHOOSE YOUR PLAN</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {[{ val: "individual", icon: "🧑", label: "Individual" }, { val: "couple", icon: "💑", label: "Couple" }].map(({ val, icon, label }) => (
+                    <button key={val} onClick={() => setSF(f => ({ ...f, plan: val }))} style={{
+                      background: sf.plan === val ? `${G.purple}25` : G.bg2,
+                      border: `2px solid ${sf.plan === val ? G.purple : G.border}`,
+                      borderRadius: 12, padding: "12px 8px", cursor: "pointer", textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: 22 }}>{icon}</div>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: G.text, marginTop: 3 }}>{label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>YOUR NAME *</label>
+                <input value={sf.name} onChange={e => setSF(f => ({ ...f, name: e.target.value }))} placeholder="First name" />
+              </div>
+              {sf.plan === "couple" && (
+                <div>
+                  <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 5, fontWeight: 700, letterSpacing: .5 }}>PARTNER'S NAME</label>
+                  <input value={sf.partner} onChange={e => setSF(f => ({ ...f, partner: e.target.value }))} placeholder="Your partner's first name" />
+                </div>
+              )}
+              <Btn full size="lg" style={{ marginTop: 4 }} onClick={() => onSuccess("complete_profile", sf, authUser)} disabled={!sf.name}>
+                💾 Finish Setup →
+              </Btn>
+            </div>
+          ) : mode === "signup" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
               <div>
                 <label style={{ fontSize: 10, color: G.textMuted, display: "block", marginBottom: 7, fontWeight: 700, letterSpacing: .5 }}>CHOOSE YOUR PLAN</label>
@@ -915,10 +948,13 @@ export default function App() {
         setUser(data.data);
         setScreen("app");
       } else {
-        // Need to create profile data (this handles edge case if they just signed up)
-        setUser(null);
+        setAuthCfg({ mode: "complete_profile", plan: "couple" });
+        setScreen("auth");
       }
-    } catch { }
+    } catch {
+      setAuthCfg({ mode: "complete_profile", plan: "couple" });
+      setScreen("auth");
+    }
   };
 
   const persist = async (dataToSave, uuid) => {
@@ -935,8 +971,8 @@ export default function App() {
   const handleAuth = async (mode, fd, authUser) => {
     if (!authUser) return;
 
-    if (mode === "signup") {
-      const nu = newUser(fd.name, fd.partner, fd.plan, fd.email);
+    if (mode === "signup" || mode === "complete_profile") {
+      const nu = newUser(fd.name, fd.partner, fd.plan, authUser.email);
       await persist(nu, authUser.id);
       setUser(nu);
       setScreen("app");
@@ -957,7 +993,7 @@ export default function App() {
   );
 
   if (screen === "auth") return (
-    <><style>{css}</style><Auth mode={authCfg.mode} defaultPlan={authCfg.plan} onSuccess={handleAuth} onBack={() => setScreen("landing")} /></>
+    <><style>{css}</style><Auth authUser={authSession?.user} mode={authCfg.mode} defaultPlan={authCfg.plan} onSuccess={handleAuth} onBack={() => setScreen("landing")} /></>
   );
 
   if (screen === "app" && user) return <AppShell user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
