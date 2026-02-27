@@ -416,7 +416,7 @@ const Dashboard = ({ user }) => {
           </h2>
           <p style={{ color: G.textMuted, fontSize: 12, marginTop: 3 }}>Here's how your journey is going.</p>
         </div>
-        <a href="/couple_goals_tracker.xlsx" download style={{ textDecoration: "none" }}>
+        <a href="/Ubuntu_Goal_2gether_Tracker.xlsx" download style={{ textDecoration: "none" }}>
           <Btn size="sm" variant="gold">📥 Download Excel version of this app</Btn>
         </a>
       </div>
