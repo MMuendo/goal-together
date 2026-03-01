@@ -354,8 +354,15 @@ const HallOfFame = ({ achieved, onAdd, onDelete, userName, partnerName }) => {
 // ── Check-In ──────────────────────────────────────────────────────────────────
 const CheckIn = ({ checkins, onUpdate }) => {
   const [active, setActive] = useState(new Date().getMonth());
+  const [saving, setSaving] = useState(false);
   const ci = checkins[active];
   const set = (k, v) => onUpdate(active, { ...ci, [k]: v });
+
+  const handleSave = () => {
+    setSaving(true);
+    // onUpdate already updates the parent state which is persisted to Supabase via handleUpdateUser
+    setTimeout(() => setSaving(false), 800);
+  };
 
   return (
     <div className="fadeUp">
@@ -386,11 +393,15 @@ const CheckIn = ({ checkins, onUpdate }) => {
           ].map(({ key, label, color }) => (
             <div key={key}>
               <label style={{ fontSize: 10, fontWeight: 700, color, display: "block", marginBottom: 5, letterSpacing: .4 }}>{label.toUpperCase()}</label>
-              <textarea rows={2} value={ci[key]} onChange={e => set(key, e.target.value)} style={{ resize: "none" }} />
+              <textarea rows={2} value={ci[key] || ""} onChange={e => set(key, e.target.value)} style={{ resize: "none" }} />
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 14 }}><Btn full>💾 Save Check-In</Btn></div>
+        <div style={{ marginTop: 14 }}>
+          <Btn full onClick={handleSave} disabled={saving}>
+            {saving ? "✓ Saved" : "💾 Save Check-In"}
+          </Btn>
+        </div>
       </Card>
     </div>
   );
