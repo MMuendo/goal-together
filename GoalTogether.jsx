@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePaystackPayment } from "react-paystack";
 import { supabase } from "./supabaseClient";
 
@@ -976,6 +976,13 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authSession, setAuthSession] = useState(null);
 
+  const screenRef = useRef(screen);
+  const authCfgRef = useRef(authCfg);
+  useEffect(() => {
+    screenRef.current = screen;
+    authCfgRef.current = authCfg;
+  }, [screen, authCfg]);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthSession(session);
@@ -991,7 +998,7 @@ export default function App() {
       setAuthSession(session);
       if (session) {
         // Delay fetching so we don't accidentally hide the reset form on recovery
-        if (screen !== "auth" || authCfg.mode !== "reset_password") {
+        if (screenRef.current !== "auth" || authCfgRef.current.mode !== "reset_password") {
           fetchUserData(session.user);
         }
       }
@@ -999,8 +1006,7 @@ export default function App() {
     });
 
     return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, authCfg.mode]);
+  }, []);
 
   const fetchUserData = async (authUser) => {
     try {
